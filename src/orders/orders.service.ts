@@ -1,28 +1,95 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
+import { Order, OrderStatus } from 'generated/prisma';
+import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class OrdersService {
+  private logger = new Logger(OrdersService.name);
+  constructor(private prismaService: PrismaService) {}
+
   create(createOrderDto: CreateOrderDto) {
-    return 'This action adds a new order';
+    this.logger.log('Creating a new order', createOrderDto);
+    return this.prismaService.order.create({
+      data: {
+        orderNumber: createOrderDto.orderNumber,
+        status: createOrderDto.status,
+        products: {
+          create: createOrderDto.products.map((p) => ({
+            qty: p.qty,
+            unitPrice: p.unitPrice,
+            product: {
+              connect: { id: p.productId },
+            },
+          })),
+        },
+      },
+    });
   }
 
   findAll() {
-    return `This action returns all orders`;
+    return this.prismaService.order.findMany({
+      orderBy: {
+        id: 'asc',
+      },
+      include: {
+        products: true,
+      },
+    });
   }
 
   findOne(id: number) {
-    return `This action returns a #${id} order`;
+    this.logger.log(`Finding order with id: ${id}`);
+    return this.prismaService.order.findUnique({
+      where: { id },
+      include: {
+        products: true,
+      },
+    });
   }
 
-  update(id: number, updateOrderDto: UpdateOrderDto) {
-    return `This action updates a #${id} order`;
+  async update(id: number, updateOrderDto: UpdateOrderDto) {
+    this.logger.log(`Updating order #${id}`, updateOrderDto);
+
+    // Delete existing products related to this order
+    await this.prismaService.orderProduct.deleteMany({
+      where: { orderId: id },
+    });
+
+    // Update the order and recreate product links
+    return this.prismaService.order.update({
+      where: { id },
+      data: {
+        orderNumber: updateOrderDto.orderNumber,
+        status: updateOrderDto.status,
+        ...(updateOrderDto.products && {
+          products: {
+            create: updateOrderDto.products.map((p) => ({
+              qty: p.qty,
+              unitPrice: p.unitPrice,
+              product: {
+                connect: { id: p.productId },
+              },
+            })),
+          },
+        }),
+      },
+    });
   }
 
   remove(id: number) {
-    return `This action removes a #${id} order`;
+    this.logger.log(`Removing order with id: ${id}`);
+    return this.prismaService.order.delete({
+      where: { id },
+    });
   }
 
-  updateStatus(id: number, status: OrderStatus){};
+  updateStatus(id: number, status: OrderStatus) {
+    this.logger.log(`Updating status of order #${id} to ${status}`);
+    return this.prismaService.order.update({
+      where: { id },
+      data: { status: status },
+    });
+  }
 }
