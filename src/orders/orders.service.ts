@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
-import { Order, OrderStatus } from 'generated/prisma';
-import { PrismaService } from 'src/prisma.service';
+import { OrderStatus } from '@prisma/client';
+import { PrismaService } from '../prisma.service';
+
 
 @Injectable()
 export class OrdersService {
